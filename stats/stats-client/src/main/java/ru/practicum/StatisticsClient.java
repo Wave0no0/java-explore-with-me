@@ -37,21 +37,21 @@ public class StatisticsClient {
         sendHttpRequest(HttpMethod.POST, "/hit", null, hitData);
     }
 
-    public List<ViewStatsDto> retrieveViewStatistics(LocalDateTime startTime, LocalDateTime endTime, 
+    public List<ViewStatsDto> retrieveViewStatistics(LocalDateTime startTime, LocalDateTime endTime,
                                                      List<String> endpointUris, Boolean uniqueOnly) {
         Map<String, Object> queryParams = Map.of(
                 "start", startTime.format(DATE_FORMATTER),
                 "end", endTime.format(DATE_FORMATTER),
                 "uris", String.join(",", endpointUris),
                 "unique", uniqueOnly);
-        
+
         ResponseEntity<Object> response = sendHttpRequest(
                 HttpMethod.GET,
                 "/stats?start={start}&end={end}&uris={uris}&unique={unique}",
                 queryParams,
                 null
         );
-        
+
         try {
             if (response.getBody() == null) {
                 throw new IllegalStateException("Empty response body from statistics service");
