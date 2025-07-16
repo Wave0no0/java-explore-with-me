@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import ru.practicum.ewm.category.model.Category;
-import ru.practicum.ewm.enums.EventStatus;
+import ru.practicum.ewm.enums.State;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.util.DateTimeUtil;
 
@@ -68,10 +68,8 @@ public class Event {
     private Boolean requestModeration;
 
     @Enumerated(value = EnumType.STRING)
-    private EventStatus status;
+    private State state;
 
     @NotBlank(message = "Event title must not be blank")
     private String title;
-
-    private Long views;
 }

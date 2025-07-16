@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.enums.State;
-import ru.practicum.ewm.enums.EventStatus;
 import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.repository.EventRepository;
 import ru.practicum.ewm.exception.AccessDeniedException;
@@ -50,7 +49,7 @@ public class RequestServiceImpl implements RequestService {
             log.warn("Request from initiator, userId: {}, eventId: {}", userId, eventId);
             throw new AccessDeniedException("Event initiator can't submit a request to their own event");
         }
-        if (!EventStatus.PUBLISHED.equals(event.getStatus())) {
+        if (!State.PUBLISHED.equals(event.getState())) {
             log.warn("Request for unpublished event, userId: {}, eventId: {}", userId, eventId);
             throw new ConflictException("Only published events are available for requests");
         }

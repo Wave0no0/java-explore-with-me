@@ -6,12 +6,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.EndpointHitSaveDto;
-import ru.practicum.StatisticsClient;
+import ru.practicum.StatsClient;
 import ru.practicum.ViewStatsDto;
 import ru.practicum.ewm.category.model.Category;
 import ru.practicum.ewm.category.repository.CategoryRepository;
-import ru.practicum.ewm.enums.EventSortType;
-import ru.practicum.ewm.enums.EventStatus;
+import ru.practicum.ewm.enums.Sort;
+import ru.practicum.ewm.enums.State;
 import ru.practicum.ewm.event.dto.*;
 import ru.practicum.ewm.event.mapper.EventMapper;
 import ru.practicum.ewm.event.mapper.LocationMapper;
@@ -25,7 +25,6 @@ import ru.practicum.ewm.exception.InvalidDateException;
 import ru.practicum.ewm.exception.NotFoundException;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
-import ru.practicum.ewm.enums.StateAction;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -41,250 +40,31 @@ public class EventServiceImpl implements EventService {
     private final CategoryRepository categoryRepository;
     private final EventMapper eventMapper;
     private final LocationMapper locationMapper;
-    private final StatisticsClient statisticsClient;
+    private final StatsClient statsClient;
 
     @Override
     @Transactional
-    public EventDto createEvent(Long userId, EventSaveDto eventSaveDto) {
-        log.info("Creating new event");
-        User eventInitiator = findUserById(userId);
-        Category eventCategory = findCategoryById(eventSaveDto.getCategory());
+    public EventDto addEvent(Long userId, EventSaveDto eventSaveDto) {
+        log.info("Saving event");
+        User initiator = findUserById(userId);
+        Category category = findCategoryById(eventSaveDto.getCategory());
 
-        validateEventDate(eventSaveDto.getEventDate());
-
-        Event newEvent = eventMapper.mapToEvent(eventSaveDto);
-        newEvent.setCategory(eventCategory);
-        newEvent.setConfirmedRequests(0);
-        newEvent.setInitiator(eventInitiator);
-        newEvent.setCreatedOn(LocalDateTime.now());
-        newEvent.setStatus(EventStatus.AWAITING_MODERATION);
-
-        Location eventLocation = locationRepository.save(locationMapper.mapToLocation(eventSaveDto.getLocation()));
-        newEvent.setLocation(eventLocation);
-
-        setDefaultValues(newEvent, eventSaveDto);
-
-        EventDto createdEvent = eventMapper.mapToEventDto(eventRepository.save(newEvent));
-        log.info("Event created successfully, eventDto: {}", createdEvent);
-        return createdEvent;
-    }
-
-    @Override
-    public List<EventDto> findUserEvents(Long userId, Integer from, Integer size) {
-        log.info("Finding user's events");
-        List<EventDto> userEvents = eventRepository.findUserEventsLimited(userId, size, from).stream()
-                .map(eventMapper::mapToEventDto)
-                .toList();
-        log.info("{} user events found", userEvents.size());
-        return userEvents;
-    }
-
-    @Override
-    public List<EventDto> findEventsForAdmin(List<Long> users, List<EventStatus> states, List<Long> categories,
-                                             LocalDateTime rangeStart, LocalDateTime rangeEnd,
-                                             Integer from, Integer size) {
-        log.info("Finding events for admin");
-        validateDateRange(rangeStart, rangeEnd);
-        List<Event> adminEvents = eventRepository.findEventsWithFilters(
-                users, states, categories, rangeStart, rangeEnd, from, size
-        );
-        log.info("{} events found for admin", adminEvents.size());
-        return adminEvents.stream()
-                .map(eventMapper::mapToEventDto)
-                .toList();
-    }
-
-    @Override
-    public EventDto findUserEventById(Long userId, Long eventId) {
-        log.info("Finding event by user");
-        EventDto foundEvent = eventMapper.mapToEventDto(findEventById(eventId));
-        log.info("Event found successfully, eventDto: {}", foundEvent);
-        return foundEvent;
-    }
-
-    @Override
-    @Transactional
-    public EventDto modifyEventByUser(Long userId, Long eventId, EventUpdateUserDto eventUpdate) {
-        log.info("Modifying user's event");
-        Event existingEvent = findEventById(eventId);
-        validateUserOwnership(userId, existingEvent);
-        validateEventModificationState(existingEvent);
-        validateEventDateForModification(eventUpdate.getEventDate());
-
-        eventMapper.updateEventFromUserRequest(eventUpdate, existingEvent);
-
-        if (eventUpdate.getCategory() != null) {
-            Category updatedCategory = findCategoryById(eventUpdate.getCategory());
-            existingEvent.setCategory(updatedCategory);
+        if (eventSaveDto.getEventDate().isBefore(LocalDateTime.now().plusHours(2L))) {
+            log.warn("Can't save event {} with invalid date", eventSaveDto);
+            throw new InvalidDateException("Event can't start earlier than 2 hours from now");
         }
 
-        processUserStateAction(eventUpdate.getStateAction(), existingEvent);
-        EventDto modifiedEvent = eventMapper.mapToEventDto(existingEvent);
-        log.info("User's event modified successfully, eventDto: {}", modifiedEvent);
-        return modifiedEvent;
-    }
+        Event event = eventMapper.mapToEvent(eventSaveDto);
+        event.setCategory(category);
+        event.setConfirmedRequests(0);
+        event.setInitiator(initiator);
+        event.setCreatedOn(LocalDateTime.now());
+        event.setState(State.PENDING);
 
-    @Override
-    @Transactional
-    public EventDto moderateEventByAdmin(Long eventId, EventUpdateAdminDto eventUpdate) {
-        log.info("Moderating event by admin");
-        Event targetEvent = findEventById(eventId);
+        Location location = locationRepository.save(locationMapper.mapToLocation(eventSaveDto.getLocation()));
+        event.setLocation(location);
+        event.setCategory(category);
 
-        validateEventDateForAdminModeration(eventUpdate.getEventDate(), targetEvent);
-
-        eventMapper.updateEventFromAdminRequest(eventUpdate, targetEvent);
-
-        if (eventUpdate.getCategory() != null) {
-            Category updatedCategory = findCategoryById(eventUpdate.getCategory());
-            targetEvent.setCategory(updatedCategory);
-        }
-
-        processAdminStateAction(eventUpdate.getStateAction(), targetEvent);
-        EventDto moderatedEvent = eventMapper.mapToEventDto(targetEvent);
-        log.info("Event moderated successfully by admin, eventDto: {}", moderatedEvent);
-        return moderatedEvent;
-    }
-
-    @Override
-    public EventDto findEventById(Long eventId, HttpServletRequest request) {
-        Event targetEvent = findEventById(eventId);
-        if (!EventStatus.PUBLISHED.equals(targetEvent.getStatus())) {
-            log.warn("Event with id {} not found", eventId);
-            throw new NotFoundException(String.format("Event with id %d not found", eventId));
-        }
-        recordEventView(request);
-        EventDto foundEvent = eventMapper.mapToEventDto(targetEvent);
-        foundEvent.setViews(calculateEventViews(targetEvent));
-        log.info("Event found successfully, eventDto: {}", foundEvent);
-        return foundEvent;
-    }
-
-    @Override
-    public List<EventShortDto> findEvents(String text, List<Long> categories, Boolean paid, LocalDateTime rangeStart,
-                                          LocalDateTime rangeEnd, Boolean onlyAvailable, EventSortType sort, Integer from,
-                                          Integer size, HttpServletRequest request) {
-        log.info("Finding public events");
-        validateDateRange(rangeStart, rangeEnd);
-        List<Event> publicEvents = eventRepository.findPublicEvents(
-                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, from, size
-        );
-        recordEventView(request);
-        List<EventShortDto> eventShortDtos = publicEvents.stream()
-                .map(event -> {
-                    EventShortDto eventShortDto = eventMapper.mapToEventShortDto(event);
-                    eventShortDto.setViews(calculateEventViews(event));
-                    return eventShortDto;
-                })
-                .toList();
-        log.info("{} public events found", eventShortDtos.size());
-        return applyEventSorting(eventShortDtos, sort);
-    }
-
-    private User findUserById(Long userId) {
-        log.debug("Finding user with id {}", userId);
-        return userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    log.warn("User with id {} not found", userId);
-                    return new NotFoundException(String.format("User with id %d not found", userId));
-                });
-    }
-
-    private Event findEventById(Long eventId) {
-        log.debug("Finding event with id {}", eventId);
-        return eventRepository.findById(eventId)
-                .orElseThrow(() -> {
-                    log.warn("Event with id {} not found", eventId);
-                    return new NotFoundException(String.format("Event with id %d not found", eventId));
-                });
-    }
-
-    private Category findCategoryById(Long categoryId) {
-        log.debug("Finding category with id {}", categoryId);
-        return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> {
-                    log.warn("Category with id {} not found", categoryId);
-                    return new NotFoundException(String.format("Category with id %d not found", categoryId));
-                });
-    }
-
-    private void recordEventView(HttpServletRequest request) {
-        log.debug("Recording event view, client ip: {}, path: {}", request.getRemoteAddr(), request.getRequestURI());
-        EndpointHitSaveDto hitData = new EndpointHitSaveDto(
-                "ewm-service",
-                request.getRequestURI(),
-                request.getRemoteAddr(),
-                LocalDateTime.now()
-        );
-        statisticsClient.recordEndpointHit(hitData);
-        log.debug("Event view recorded successfully {}", hitData);
-    }
-
-    private Long calculateEventViews(Event event) {
-        List<ViewStatsDto> viewStats = statisticsClient.retrieveViewStatistics(
-                event.getPublishedOn(),
-                LocalDateTime.now(),
-                List.of("/events/" + event.getId()),
-                true
-        );
-        return viewStats.isEmpty() ? 0 : viewStats.getFirst().getHits();
-    }
-
-    private List<EventShortDto> applyEventSorting(List<EventShortDto> events, EventSortType sort) {
-        log.debug("Applying sorting to {} events by {}", events.size(), sort);
-        return switch (sort) {
-            case BY_VIEWS -> events.stream()
-                    .sorted(Comparator.comparing(EventShortDto::getViews).reversed()).toList();
-            case BY_DATE -> events.stream()
-                    .sorted(Comparator.comparing(EventShortDto::getEventDate).reversed()).toList();
-            case null -> events;
-        };
-    }
-
-    private void validateDateRange(LocalDateTime rangeStart, LocalDateTime rangeEnd) {
-        if (rangeStart != null && rangeEnd != null) {
-            if (rangeEnd.isBefore(rangeStart)) {
-                throw new InvalidDateException("End date cannot be before start date");
-            }
-        }
-    }
-
-    private void validateEventDate(LocalDateTime eventDate) {
-        if (eventDate.isBefore(LocalDateTime.now().plusHours(2L))) {
-            log.warn("Cannot create event with invalid date");
-            throw new InvalidDateException("Event cannot start earlier than 2 hours from now");
-        }
-    }
-
-    private void validateUserOwnership(Long userId, Event event) {
-        if (!userId.equals(event.getInitiator().getId())) {
-            log.warn("Modification attempt not from initiator, userId: {}, eventId: {}", userId, event.getId());
-            throw new AccessDeniedException("Only initiator can modify event");
-        }
-    }
-
-    private void validateEventModificationState(Event event) {
-        if (!EventStatus.AWAITING_MODERATION.equals(event.getStatus()) &&
-            !EventStatus.REJECTED.equals(event.getStatus())) {
-            log.warn("Event is in wrong state {}", event.getStatus());
-            throw new ConflictException("Only awaiting moderation or rejected event can be modified");
-        }
-    }
-
-    private void validateEventDateForModification(LocalDateTime eventDate) {
-        if (eventDate != null && eventDate.isBefore(LocalDateTime.now().plusHours(2L))) {
-            log.warn("Cannot modify event, <2 hours before start");
-            throw new InvalidDateException("Cannot modify event because it starts in less than 2 hours");
-        }
-    }
-
-    private void validateEventDateForAdminModeration(LocalDateTime eventDate, Event event) {
-        if (eventDate != null && event.getEventDate().isBefore(LocalDateTime.now().plusHours(1L))) {
-            log.warn("Cannot moderate event {}, <1 hour before start", event);
-            throw new InvalidDateException("Cannot moderate event because it starts in less than 1 hour");
-        }
-    }
-
-    private void setDefaultValues(Event event, EventSaveDto eventSaveDto) {
         if (eventSaveDto.getPaid() == null) {
             event.setPaid(false);
         }
@@ -294,35 +74,225 @@ public class EventServiceImpl implements EventService {
         if (eventSaveDto.getRequestModeration() == null) {
             event.setRequestModeration(true);
         }
+
+        EventDto eventDto = eventMapper.mapToEventDto(eventRepository.save(event));
+        log.info("Event saved successfully, eventDto: {}", eventDto);
+        return eventDto;
     }
 
-    private void processUserStateAction(StateAction stateAction, Event event) {
-        if (stateAction != null) {
-            switch (stateAction) {
-                case SEND_TO_REVIEW -> event.setStatus(EventStatus.AWAITING_MODERATION);
-                case CANCEL_REVIEW -> event.setStatus(EventStatus.REJECTED);
+    @Override
+    public List<EventDto> getUserEvents(Long userId, Integer from, Integer size) {
+        log.info("Search user's events");
+        List<EventDto> eventDtos = eventRepository.findUserEventsLimited(userId, size, from).stream()
+                .map(eventMapper::mapToEventDto)
+                .toList();
+        log.info("{} events were found", eventDtos.size());
+        return eventDtos;
+    }
+
+    @Override
+    public List<EventDto> getEventsByAdmin(List<Long> users, List<State> states, List<Long> categories,
+                                           LocalDateTime rangeStart, LocalDateTime rangeEnd,
+                                           Integer from, Integer size) {
+        log.info("Search events by admin");
+        checkRange(rangeStart, rangeEnd);
+        List<Event> events = eventRepository.findEventsFiltered(
+                users, states, categories, rangeStart, rangeEnd, from, size
+        );
+        log.info("{} events were found by admin", events.size());
+        return events.stream()
+                .map(eventMapper::mapToEventDto)
+                .toList();
+    }
+
+    @Override
+    public EventDto getUserEventById(Long userId, Long eventId) {
+        log.info("Search event by user");
+        EventDto eventDto = eventMapper.mapToEventDto(findEventById(eventId));
+        log.info("Event was found successfully, eventDto: {}", eventDto);
+        return eventDto;
+    }
+
+    @Override
+    @Transactional
+    public EventDto updateEventByUser(Long userId, Long eventId, EventUpdateUserDto eventUpdate) {
+        log.info("Update user's event");
+        Event event = findEventById(eventId);
+        if (!userId.equals(event.getInitiator().getId())) {
+            log.warn("Updating attempt not from initiator, userId: {}, eventId: {}", userId, eventId);
+            throw new AccessDeniedException("Only initiator can update event");
+        }
+        if (!State.PENDING.equals(event.getState()) && !State.CANCELED.equals(event.getState())) {
+            log.warn("Event is in wrong state {}", event.getState());
+            throw new ConflictException("Only pending or canceled event can be updated");
+        }
+        if (event.getEventDate().isBefore(LocalDateTime.now().plusHours(2L))) {
+            log.warn("Can't update event {}, <2 hours before start", event);
+            throw new InvalidDateException("Can't update event because it starts in less than 2 hours");
+        }
+
+        eventMapper.updateEventFromUserRequest(eventUpdate, event);
+
+        if (eventUpdate.getCategory() != null) {
+            Category category = findCategoryById(eventUpdate.getCategory());
+            event.setCategory(category);
+        }
+
+        if (eventUpdate.getStateAction() != null) {
+            switch (eventUpdate.getStateAction()) {
+                case SEND_TO_REVIEW -> event.setState(State.PENDING);
+                case CANCEL_REVIEW -> event.setState(State.CANCELED);
                 default -> throw new IllegalArgumentException("State action is not supported");
             }
         }
+        EventDto eventDto = eventMapper.mapToEventDto(event);
+        log.info("User's event updated successfully, eventDto: {}", eventDto);
+        return eventDto;
     }
 
-    private void processAdminStateAction(StateAction stateAction, Event event) {
-        if (stateAction != null) {
-            if (EventStatus.AWAITING_MODERATION.equals(event.getStatus())) {
-                switch (stateAction) {
+    @Override
+    @Transactional
+    public EventDto updateEventByAdmin(Long eventId, EventUpdateAdminDto eventUpdate) {
+        log.info("Update event by admin");
+        Event event = findEventById(eventId);
+
+        if (eventUpdate.getEventDate() != null
+                && event.getEventDate().isBefore(LocalDateTime.now().plusHours(1L))) {
+            log.warn("Can't update event {}, <1 hour before start", event);
+            throw new InvalidDateException("Can't update event because it starts in less than 1 hour");
+        }
+
+        eventMapper.updateEventFromAdminRequest(eventUpdate, event);
+
+        if (eventUpdate.getCategory() != null) {
+            Category category = findCategoryById(eventUpdate.getCategory());
+            event.setCategory(category);
+        }
+
+        if (eventUpdate.getStateAction() != null) {
+            if (State.PENDING.equals(event.getState())) {
+                switch (eventUpdate.getStateAction()) {
                     case PUBLISH_EVENT:
-                        event.setStatus(EventStatus.PUBLISHED);
+                        event.setState(State.PUBLISHED);
                         event.setPublishedOn(LocalDateTime.now());
                         break;
                     case REJECT_EVENT:
-                        event.setStatus(EventStatus.REJECTED);
+                        event.setState(State.CANCELED);
                         break;
                     default:
                         throw new IllegalArgumentException("State action is not supported");
                 }
             } else {
-                log.warn("Event is not awaiting moderation, state: {}", event.getStatus());
-                throw new ConflictException("Event must be awaiting moderation for status moderation");
+                log.warn("Event is not pending, state: {}", event.getState());
+                throw new ConflictException("Event must be pending for status moderation");
+            }
+        }
+        EventDto eventDto = eventMapper.mapToEventDto(event);
+        log.info("Event updated successfully by admin, eventDto: {}", eventDto);
+        return eventDto;
+    }
+
+    @Override
+    public EventDto getEventById(Long eventId, HttpServletRequest request) {
+        Event event = findEventById(eventId);
+        if (!State.PUBLISHED.equals(event.getState())) {
+            log.warn("Event with id {} not found", eventId);
+            throw new NotFoundException(String.format("Event with id %d not found", eventId));
+        }
+        sendStats(request);
+        EventDto eventDto = eventMapper.mapToEventDto(event);
+        eventDto.setViews(getEventViews(event));
+        log.info("Event was found successfully, eventDto: {}", eventDto);
+        return eventDto;
+    }
+
+    @Override
+    public List<EventShortDto> searchEvents(String text, List<Long> categories, Boolean paid, LocalDateTime rangeStart,
+                                            LocalDateTime rangeEnd, Boolean onlyAvailable, Sort sort, Integer from,
+                                            Integer size, HttpServletRequest request) {
+        log.info("Search public events");
+        checkRange(rangeStart, rangeEnd);
+        List<Event> events = eventRepository.searchEvents(
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, from, size
+        );
+        sendStats(request);
+        List<EventShortDto> eventShortDtos = events.stream()
+                .map(event -> {
+                    EventShortDto eventShortDto = eventMapper.mapToEventShortDto(event);
+                    eventShortDto.setViews(getEventViews(event));
+                    return eventShortDto;
+                })
+                .toList();
+        log.info("{} public events were found", eventShortDtos.size());
+        return sortEvents(eventShortDtos, sort);
+    }
+
+
+    private User findUserById(Long userId) {
+        log.debug("Search user with id {}", userId);
+        return userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.warn("User with id {} not found", userId);
+                    return new NotFoundException(String.format("User with id %d not found", userId));
+                });
+    }
+
+    private Event findEventById(Long eventId) {
+        log.debug("Search event with id {}", eventId);
+        return eventRepository.findById(eventId)
+                .orElseThrow(() -> {
+                    log.warn("Event with id {} not found", eventId);
+                    return new NotFoundException(String.format("Event with id %d not found", eventId));
+                });
+
+    }
+
+    private Category findCategoryById(Long categoryId) {
+        log.debug("Search category with id {}", categoryId);
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> {
+                    log.warn("Category with id {} not found", categoryId);
+                    return new NotFoundException(String.format("Category with id %d not found", categoryId));
+                });
+    }
+
+    private void sendStats(HttpServletRequest request) {
+        log.debug("Save hit, client ip: {}, path: {}", request.getRemoteAddr(), request.getRequestURI());
+        EndpointHitSaveDto hitSaveDto = new EndpointHitSaveDto(
+                "ewm-service",
+                request.getRequestURI(),
+                request.getRemoteAddr(),
+                LocalDateTime.now()
+        );
+        statsClient.saveHit(hitSaveDto);
+        log.debug("Hit saved successfully {}", hitSaveDto);
+    }
+
+    private Long getEventViews(Event event) {
+        List<ViewStatsDto> stats = statsClient.getStats(
+                event.getPublishedOn(),
+                LocalDateTime.now(),
+                List.of("/events/" + event.getId()),
+                true
+        );
+        return stats.isEmpty() ? 0 : stats.getFirst().getHits();
+    }
+
+    private List<EventShortDto> sortEvents(List<EventShortDto> eventShortDtos, Sort sort) {
+        log.debug("Sort {} events by {}", eventShortDtos.size(), sort);
+        return switch (sort) {
+            case VIEWS -> eventShortDtos.stream()
+                    .sorted(Comparator.comparing(EventShortDto::getViews).reversed()).toList();
+            case EVENT_DATE -> eventShortDtos.stream()
+                    .sorted(Comparator.comparing(EventShortDto::getEventDate).reversed()).toList();
+            case null -> eventShortDtos;
+        };
+    }
+
+    private void checkRange(LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+        if (rangeStart != null && rangeEnd != null) {
+            if (rangeEnd.isBefore(rangeStart)) {
+                throw new InvalidDateException("End date can't be before start date");
             }
         }
     }

@@ -21,35 +21,35 @@ public class EventPrivateController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public EventDto createEvent(@PathVariable Long userId,
-                                @RequestBody @Valid EventSaveDto eventSaveDto) {
+    public EventDto addEvent(@PathVariable Long userId,
+                             @RequestBody @Valid EventSaveDto eventSaveDto) {
         log.info("POST /users/{userId}/events {}", eventSaveDto);
-        return eventService.createEvent(userId, eventSaveDto);
+        return eventService.addEvent(userId, eventSaveDto);
     }
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<EventDto> findUserEvents(@PathVariable Long userId,
-                                         @RequestParam(defaultValue = "0") Integer from,
-                                         @RequestParam(defaultValue = "10") Integer size) {
+    public List<EventDto> getUserEvents(@PathVariable Long userId,
+                                        @RequestParam(defaultValue = "0") Integer from,
+                                        @RequestParam(defaultValue = "10") Integer size) {
         log.info("GET /users/{userId}/events, userId: {}, from: {}, size: {}", userId, from, size);
-        return eventService.findUserEvents(userId, from, size);
+        return eventService.getUserEvents(userId, from, size);
     }
 
     @GetMapping("/{eventId}")
     @ResponseStatus(HttpStatus.OK)
-    public EventDto findUserEventById(@PathVariable Long userId,
-                                      @PathVariable Long eventId) {
+    public EventDto getEventById(@PathVariable Long userId,
+                                 @PathVariable Long eventId) {
         log.info("GET /users/{userId}/events/{eventId}, eventId {}", eventId);
-        return eventService.findUserEventById(userId, eventId);
+        return eventService.getUserEventById(userId, eventId);
     }
 
     @PatchMapping("/{eventId}")
     @ResponseStatus(HttpStatus.OK)
-    public EventDto modifyEvent(@PathVariable Long userId,
+    public EventDto updateEvent(@PathVariable Long userId,
                                 @PathVariable Long eventId,
                                 @RequestBody @Valid EventUpdateUserDto eventUpdateDto) {
         log.info("PATCH /users/{userId}/events/{eventId} {}", eventUpdateDto);
-        return eventService.modifyEventByUser(userId, eventId, eventUpdateDto);
+        return eventService.updateEventByUser(userId, eventId, eventUpdateDto);
     }
 }

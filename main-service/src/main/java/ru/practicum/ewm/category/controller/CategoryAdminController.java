@@ -18,21 +18,23 @@ public class CategoryAdminController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CategoryDto createCategory(@RequestBody @Valid CategorySaveDto categorySaveDto) {
+    public CategoryDto addCategory(@RequestBody @Valid CategorySaveDto categorySaveDto) {
         log.info("POST /admin/categories {}", categorySaveDto);
         return categoryService.addCategory(categorySaveDto);
     }
 
-    @DeleteMapping("/{catId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void removeCategory(@PathVariable Long catId) {
-        log.info("DELETE /admin/categories/{catId}, catId: {}", catId);
-        categoryService.deleteCategoryById(catId);
+    @PatchMapping("/{categoryId}")
+    @ResponseStatus(HttpStatus.OK)
+    public CategoryDto updateCategory(@PathVariable Long categoryId,
+                                      @RequestBody @Valid CategorySaveDto categorySaveDto) {
+        log.info("PATCH /admin/categories/{categoryId} {}", categorySaveDto);
+        return categoryService.updateCategory(categoryId, categorySaveDto);
     }
 
-    @PatchMapping("/{catId}")
-    public CategoryDto modifyCategory(@PathVariable Long catId, @RequestBody @Valid CategorySaveDto categorySaveDto) {
-        log.info("PATCH /admin/categories/{catId} {}", categorySaveDto);
-        return categoryService.updateCategory(catId, categorySaveDto);
+    @DeleteMapping("/{categoryId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCategory(@PathVariable Long categoryId) {
+        log.info("DELETE /admin/categories/{categoryId, categoryId {}", categoryId);
+        categoryService.deleteCategoryById(categoryId);
     }
 }

@@ -19,21 +19,23 @@ public class CompilationAdminController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CompilationDto createCompilation(@RequestBody @Valid CompilationSaveDto compilationSaveDto) {
-        log.info("POST /admin/compilations {}", compilationSaveDto);
+    public CompilationDto addCompilation(@RequestBody @Valid CompilationSaveDto compilationSaveDto) {
+        log.info("POST /compilation {}", compilationSaveDto);
         return compilationService.addCompilation(compilationSaveDto);
     }
 
-    @DeleteMapping("/{compId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void removeCompilation(@PathVariable Long compId) {
-        log.info("DELETE /admin/compilations/{compId}, compId: {}", compId);
-        compilationService.deleteCompilation(compId);
+    @PatchMapping("/{compilationId}")
+    @ResponseStatus(HttpStatus.OK)
+    public CompilationDto updateCompilation(@PathVariable Long compilationId,
+                                            @RequestBody @Valid CompilationUpdateDto compilationUpdateDto) {
+        log.info("PATCH /compilation/{compilationId} {}", compilationUpdateDto);
+        return compilationService.updateCompilation(compilationId, compilationUpdateDto);
     }
 
-    @PatchMapping("/{compId}")
-    public CompilationDto modifyCompilation(@PathVariable Long compId, @RequestBody @Valid CompilationUpdateDto compilationUpdateDto) {
-        log.info("PATCH /admin/compilations/{compId} {}", compilationUpdateDto);
-        return compilationService.updateCompilation(compId, compilationUpdateDto);
+    @DeleteMapping("/{compilationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCompilation(@PathVariable Long compilationId) {
+        log.info("DELETE /compilation/{compilationId}, compilationId: {}", compilationId);
+        compilationService.deleteCompilation(compilationId);
     }
 }

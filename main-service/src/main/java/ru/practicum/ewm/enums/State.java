@@ -2,7 +2,8 @@ package ru.practicum.ewm.enums;
 
 public enum State {
     PENDING,
+    PUBLISHED,
+    CANCELED,
     CONFIRMED,
-    REJECTED,
-    CANCELED
+    REJECTED
 }
