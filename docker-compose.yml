@@ -1,53 +1,56 @@
 services:
-  stats-server:
-    build: ./ewm-stats-service
-    container_name: stats-server
+  statistics-server:
+    build: stats/stats-server
+    container_name: statistics-server
     ports:
       - "9090:9090"
     depends_on:
-      - stats-db
+      - statistics-database
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://stats-db:5432/stats
-      SPRING_DATASOURCE_USERNAME: dbuser
-      SPRING_DATASOURCE_PASSWORD: 12345
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://statistics-database:5432/statistics_db
+      - SPRING_DATASOURCE_USERNAME=statistics_user
+      - SPRING_DATASOURCE_PASSWORD=statistics_password
 
-  stats-db:
+  statistics-database:
     image: postgres:16.1
-    container_name: stats-db
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: stats
-      POSTGRES_USER: dbuser
-      POSTGRES_PASSWORD: 12345
-    volumes:
-      - stats-data:/var/lib/postgresql/data
-
-  ewm-service:
-    build: ./ewm-service
-    container_name: ewm-service
-    ports:
-      - "8080:8080"
-    depends_on:
-      - ewm-db
-      - stats-server
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main
-      SPRING_DATASOURCE_USERNAME: dbuser
-      SPRING_DATASOURCE_PASSWORD: 12345
-
-  ewm-db:
-    image: postgres:16.1
-    container_name: ewm-db
+    container_name: statistics-database
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_DB: ewm_main
-      POSTGRES_USER: dbuser
-      POSTGRES_PASSWORD: 12345
-    volumes:
-      - ewm-data:/var/lib/postgresql/data
+      - POSTGRES_PASSWORD=statistics_password
+      - POSTGRES_USER=statistics_user
+      - POSTGRES_DB=statistics_db
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
 
-volumes:
-  stats-data:
-  ewm-data:
+  explore-with-me-service:
+    build: main-service
+    container_name: explore-with-me-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - statistics-server
+      - explore-with-me-database
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://explore-with-me-database:5432/explore_with_me_db
+      - SPRING_DATASOURCE_USERNAME=ewm_user
+      - SPRING_DATASOURCE_PASSWORD=ewm_password
+      - STATS_SERVER_URL=http://statistics-server:9090
+
+  explore-with-me-database:
+    image: postgres:16.1
+    container_name: explore-with-me-database
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_PASSWORD=ewm_password
+      - POSTGRES_USER=ewm_user
+      - POSTGRES_DB=explore_with_me_db
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
