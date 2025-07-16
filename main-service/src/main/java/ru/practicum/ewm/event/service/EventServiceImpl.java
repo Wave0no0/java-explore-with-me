@@ -107,7 +107,6 @@ public class EventServiceImpl implements EventService {
     public EventDto modifyEventByUser(Long userId, Long eventId, EventUpdateUserDto eventUpdate) {
         log.info("Modifying user's event");
         Event existingEvent = findEventById(eventId);
-
         validateUserOwnership(userId, existingEvent);
         validateEventModificationState(existingEvent);
         validateEventDateForModification(eventUpdate.getEventDate());
@@ -120,7 +119,6 @@ public class EventServiceImpl implements EventService {
         }
 
         processUserStateAction(eventUpdate.getStateAction(), existingEvent);
-
         EventDto modifiedEvent = eventMapper.mapToEventDto(existingEvent);
         log.info("User's event modified successfully, eventDto: {}", modifiedEvent);
         return modifiedEvent;
@@ -142,7 +140,6 @@ public class EventServiceImpl implements EventService {
         }
 
         processAdminStateAction(eventUpdate.getStateAction(), targetEvent);
-
         EventDto moderatedEvent = eventMapper.mapToEventDto(targetEvent);
         log.info("Event moderated successfully by admin, eventDto: {}", moderatedEvent);
         return moderatedEvent;

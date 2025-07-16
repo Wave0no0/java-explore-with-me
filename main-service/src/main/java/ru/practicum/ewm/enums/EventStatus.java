@@ -6,4 +6,4 @@ public enum EventStatus {
     REJECTED,
     CONFIRMED,
     DECLINED
-} 
+}

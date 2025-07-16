@@ -5,4 +5,4 @@ public enum State {
     CONFIRMED,
     REJECTED,
     CANCELED
-} 
+}
