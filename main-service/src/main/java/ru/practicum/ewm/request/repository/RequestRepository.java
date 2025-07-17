@@ -21,10 +21,10 @@ public interface RequestRepository extends JpaRepository<ParticipationRequest, L
 
     @Modifying
     @Query(value = """
-        UPDATE participation_request
+        UPDATE participation_requests
         SET status = :status
         WHERE id IN (
-            SELECT id FROM participation_request
+            SELECT id FROM participation_requests
             WHERE id IN :ids AND status = 'PENDING'
             LIMIT :limit
             FOR UPDATE
