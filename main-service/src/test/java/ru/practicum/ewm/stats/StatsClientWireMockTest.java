@@ -10,6 +10,7 @@ import org.springframework.web.client.RestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
 import ru.practicum.StatsClient;
 import ru.practicum.ViewStatsDto;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,7 +30,13 @@ class StatsClientWireMockTest {
     @BeforeEach
     void setUp() {
         restTemplate = mock(RestTemplate.class);
-        statsClient = new StatsClient(restTemplate);
+        RestTemplateBuilder builder = new RestTemplateBuilder() {
+            @Override
+            public RestTemplate build() {
+                return restTemplate;
+            }
+        };
+        statsClient = new StatsClient("http://localhost:9090", builder);
     }
 
     @Test

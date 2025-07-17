@@ -24,16 +24,11 @@ public class StatsClient {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(DateTimeUtil.DATE_PATTERN);
 
 
-    public StatsClient(@Value("${stats.server.url}") String serverUrl, RestTemplateBuilder builder) {
+    public StatsClient(String serverUrl, RestTemplateBuilder builder) {
         this.rest = builder
                 .uriTemplateHandler(new DefaultUriBuilderFactory(serverUrl))
                 .requestFactory(() -> new HttpComponentsClientHttpRequestFactory())
                 .build();
-        this.objectMapper = new ObjectMapper();
-    }
-
-    public StatsClient(RestTemplate restTemplate) {
-        this.rest = restTemplate;
         this.objectMapper = new ObjectMapper();
     }
 
