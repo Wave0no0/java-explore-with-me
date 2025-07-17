@@ -3,6 +3,7 @@ package ru.practicum.ewm.request.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.enums.State;
 import ru.practicum.ewm.event.model.Event;
@@ -141,16 +142,24 @@ public class RequestServiceImpl implements RequestService {
         }
 
         int availableCount = event.getParticipantLimit() - event.getConfirmedRequests();
+        if (availableCount <= 0) {
+            // Всё отклоняем
+            requests.forEach(r -> r.setStatus(State.REJECTED));
+            requestRepository.saveAll(requests);
+            return new EventRequestStatusUpdateResult(List.of(), requestMapper.mapToListRequestDto(requests));
+        }
+
+        // Подтверждаем только availableCount заявок одним запросом
+        List<Long> confirmedIds = requestRepository.updateStatusForIdsLimited(State.CONFIRMED.name(),
+                request.getRequestIds(), availableCount);
         List<ParticipationRequest> confirmed = requests.stream()
-                .limit(availableCount)
+                .filter(r -> confirmedIds.contains(r.getId()))
                 .peek(r -> r.setStatus(State.CONFIRMED))
                 .toList();
         List<ParticipationRequest> rejected = requests.stream()
-                .skip(availableCount)
+                .filter(r -> !confirmedIds.contains(r.getId()))
                 .peek(r -> r.setStatus(State.REJECTED))
                 .toList();
-
-        requestRepository.saveAll(confirmed);
         requestRepository.saveAll(rejected);
         event.setConfirmedRequests(event.getConfirmedRequests() + confirmed.size());
         log.info("Requests moderated, confirmed: {}, rejected: {}", confirmed.size(), rejected.size());

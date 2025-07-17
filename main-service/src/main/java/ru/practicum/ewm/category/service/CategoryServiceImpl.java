@@ -2,6 +2,8 @@ package ru.practicum.ewm.category.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.category.dto.CategoryDto;
@@ -45,7 +47,8 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public List<CategoryDto> getCategories(Integer from, Integer size) {
         log.info("Search categories");
-        List<CategoryDto> categoryDtos = categoryRepository.findCategoriesLimited(from, size).stream()
+        Pageable pageable = PageRequest.of(from / size, size);
+        List<CategoryDto> categoryDtos = categoryRepository.findAll(pageable).stream()
                 .map(categoryMapper::mapToCategoryDto)
                 .toList();
         log.info("{} categories were found", categoryDtos.size());
@@ -61,7 +64,8 @@ public class CategoryServiceImpl implements CategoryService {
             checkCategoryName(categorySaveDto.getName());
         }
         category.setName(categorySaveDto.getName());
-        CategoryDto categoryDto = categoryMapper.mapToCategoryDto(category);
+        Category saved = categoryRepository.save(category);
+        CategoryDto categoryDto = categoryMapper.mapToCategoryDto(saved);
         log.info("Category updated successfully, categoryDto {}", categoryDto);
         return categoryDto;
     }
