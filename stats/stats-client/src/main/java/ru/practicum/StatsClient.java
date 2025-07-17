@@ -26,22 +26,12 @@ public class StatsClient {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(DateTimeUtil.DATE_PATTERN);
 
 
-    public StatsClient() {
-        this.rest = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
-    }
-
     public StatsClient(@Value("${stats.server.url}") String serverUrl, RestTemplateBuilder builder) {
         this.rest = builder
                 .uriTemplateHandler(new DefaultUriBuilderFactory(serverUrl))
                 .requestFactory(() -> new HttpComponentsClientHttpRequestFactory())
                 .build();
         this.objectMapper = new ObjectMapper();
-    }
-
-    public StatsClient(RestTemplate rest, ObjectMapper objectMapper) {
-        this.rest = rest;
-        this.objectMapper = objectMapper;
     }
 
     public void saveHit(EndpointHitSaveDto hitSaveDto) {
