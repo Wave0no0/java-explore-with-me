@@ -106,4 +106,19 @@ class EventServiceImplTest {
         assertEquals(1, result.size());
         assertEquals(2L, result.get(0).getId());
     }
+
+    @Test
+    void addEvent_setsParticipantLimitCorrectly() {
+        saveDto.setParticipantLimit(42);
+        saveDto.setLocation(new ru.practicum.ewm.event.dto.LocationDto(1.0f, 2.0f));
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(user));
+        when(categoryRepository.findById(1L)).thenReturn(java.util.Optional.of(category));
+        when(eventMapper.mapToEvent(saveDto)).thenReturn(event);
+        when(locationMapper.mapToLocation(any())).thenReturn(location);
+        when(locationRepository.save(any())).thenReturn(location);
+        when(eventRepository.save(any())).thenReturn(event);
+        when(eventMapper.mapToEventDto(any())).thenReturn(eventDto);
+
+        assertDoesNotThrow(() -> eventService.addEvent(1L, saveDto));
+    }
 }
