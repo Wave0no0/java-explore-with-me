@@ -70,4 +70,4 @@ class CategoryServiceImplTest {
         verify(categoryRepository).findByName("TestCategory");
         verify(categoryRepository, never()).save(any());
     }
-} 
+}

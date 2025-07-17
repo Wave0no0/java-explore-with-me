@@ -10,13 +10,10 @@ import ru.practicum.ewm.enums.State;
 import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.repository.EventRepository;
 import ru.practicum.ewm.exception.ConflictException;
-import ru.practicum.ewm.exception.DuplicatedDataException;
 import ru.practicum.ewm.request.mapper.RequestMapper;
-import ru.practicum.ewm.request.model.ParticipationRequest;
 import ru.practicum.ewm.request.repository.RequestRepository;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
-import ru.practicum.util.DateTimeUtil;
 
 import java.util.Optional;
 
@@ -59,4 +56,4 @@ class RequestServiceImplTest {
         when(requestRepository.findByRequesterIdAndEventId(1L, 1L)).thenReturn(Optional.empty());
         assertThrows(ConflictException.class, () -> requestService.addRequest(1L, 1L));
     }
-} 
+}

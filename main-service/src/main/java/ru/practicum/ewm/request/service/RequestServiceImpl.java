@@ -3,7 +3,6 @@ package ru.practicum.ewm.request.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.enums.State;
 import ru.practicum.ewm.event.model.Event;
