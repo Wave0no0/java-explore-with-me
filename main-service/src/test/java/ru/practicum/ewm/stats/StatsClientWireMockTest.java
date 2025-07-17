@@ -20,17 +20,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class StatsClientWireMockTest {
-    @Mock
     private RestTemplate restTemplate;
     private StatsClient statsClient;
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        statsClient = new StatsClient("http://localhost:9090", new RestTemplateBuilder());
+        restTemplate = mock(RestTemplate.class);
+        statsClient = new StatsClient(restTemplate);
     }
 
     @Test

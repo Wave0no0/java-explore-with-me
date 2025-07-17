@@ -34,6 +34,11 @@ public class StatsClient {
         this.objectMapper = new ObjectMapper();
     }
 
+    public StatsClient(RestTemplate restTemplate) {
+        this.rest = restTemplate;
+        this.objectMapper = new ObjectMapper();
+    }
+
     public void saveHit(EndpointHitSaveDto hitSaveDto) {
         makeAndSendRequest(HttpMethod.POST, "/hit", null, hitSaveDto);
     }
