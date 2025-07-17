@@ -19,6 +19,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 
 @ExtendWith(MockitoExtension.class)
 class StatsClientWireMockTest {
@@ -29,7 +30,7 @@ class StatsClientWireMockTest {
 
     @BeforeEach
     void setUp() {
-        statsClient = new StatsClient(restTemplate, objectMapper);
+        statsClient = new StatsClient("http://localhost:9090", new RestTemplateBuilder());
     }
 
     @Test
