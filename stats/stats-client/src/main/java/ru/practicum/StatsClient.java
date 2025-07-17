@@ -3,12 +3,10 @@ package ru.practicum;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.DefaultUriBuilderFactory;
@@ -19,29 +17,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
-@Service
 public class StatsClient {
     private final RestTemplate rest;
     private final ObjectMapper objectMapper;
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(DateTimeUtil.DATE_PATTERN);
 
 
-    public StatsClient() {
-        this.rest = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
-    }
-
-    public StatsClient(@Value("${stats.server.url}") String serverUrl, RestTemplateBuilder builder) {
+    public StatsClient(String serverUrl, RestTemplateBuilder builder) {
         this.rest = builder
                 .uriTemplateHandler(new DefaultUriBuilderFactory(serverUrl))
                 .requestFactory(() -> new HttpComponentsClientHttpRequestFactory())
                 .build();
         this.objectMapper = new ObjectMapper();
-    }
-
-    public StatsClient(RestTemplate rest, ObjectMapper objectMapper) {
-        this.rest = rest;
-        this.objectMapper = objectMapper;
     }
 
     public void saveHit(EndpointHitSaveDto hitSaveDto) {
