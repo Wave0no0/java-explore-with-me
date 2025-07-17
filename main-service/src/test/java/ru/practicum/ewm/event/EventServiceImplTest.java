@@ -85,7 +85,7 @@ class EventServiceImplTest {
             locationMapper,
             statsClient
         );
-    }
+    } //l
 
     @Test
     void searchEvents_queryDsl_happyPath() {
