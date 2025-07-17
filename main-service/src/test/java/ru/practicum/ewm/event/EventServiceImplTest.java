@@ -3,6 +3,7 @@ package ru.practicum.ewm.event;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.practicum.ewm.category.model.Category;
@@ -39,13 +40,13 @@ class EventServiceImplTest {
     @Mock
     private CategoryRepository categoryRepository;
     @Mock
-    private EventMapper eventMapper;
-    @Mock
     private LocationMapper locationMapper;
     @Mock
     private StatsClient statsClient;
     @Mock
     private HttpServletRequest request;
+
+    private EventMapper eventMapper;
     private ru.practicum.ewm.event.service.EventServiceImpl eventService;
 
     private User user;
@@ -57,6 +58,16 @@ class EventServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        eventMapper = Mappers.getMapper(EventMapper.class);
+        eventService = new ru.practicum.ewm.event.service.EventServiceImpl(
+            eventRepository,
+            userRepository,
+            locationRepository,
+            categoryRepository,
+            eventMapper,
+            locationMapper,
+            statsClient
+        );
         user = new User();
         user.setId(1L);
         category = new Category();
@@ -76,15 +87,6 @@ class EventServiceImplTest {
         saveDto.setEventDate(LocalDateTime.now().plusDays(3));
         eventDto = new EventDto();
         eventDto.setId(1L);
-        eventService = new ru.practicum.ewm.event.service.EventServiceImpl(
-            eventRepository,
-            userRepository,
-            locationRepository,
-            categoryRepository,
-            eventMapper,
-            locationMapper,
-            statsClient
-        );
     }
 
     @Test
@@ -96,9 +98,6 @@ class EventServiceImplTest {
         event2.setEventDate(LocalDateTime.now().plusDays(5));
         List<Event> events = List.of(event2);
         when(eventRepository.searchEvents(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(events);
-        EventShortDto shortDto = new EventShortDto();
-        shortDto.setId(2L);
-        when(eventMapper.mapToEventShortDto(event2)).thenReturn(shortDto);
         when(statsClient.getStats(any(), any(), any(), anyBoolean())).thenReturn(List.of());
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
         when(request.getRequestURI()).thenReturn("/events/2");
