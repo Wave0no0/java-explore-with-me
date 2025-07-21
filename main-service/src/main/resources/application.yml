@@ -23,3 +23,6 @@ spring:
     url: jdbc:postgresql://ewm-db:5432/ewm_db
     username: user
     password: "12345"
+
+mapstruct:
+  component-model: spring
